@@ -99,7 +99,7 @@ func (b *Bot) validateAndGetUser(ctx context.Context, m *tg.Message,
 	if err != nil {
 		if !errors.Is(err, types.ErrorNotFound) {
 			slog.Error("Failed to get user", "error", err)
-			return nil, nil, fmt.Errorf("Internal server error")
+			return nil, nil, fmt.Errorf("internal server error")
 		}
 		dbUser, err = b.userService.CreateUser(ctx, repo.CreateUserParams{
 			ID:     userInfo.ID,
@@ -107,17 +107,17 @@ func (b *Bot) validateAndGetUser(ctx context.Context, m *tg.Message,
 		})
 		if err != nil && !errors.Is(err, types.ErrorDuplicate) {
 			slog.Error("Failed to create user", "error", err)
-			return nil, nil, fmt.Errorf("Internal server error")
+			return nil, nil, fmt.Errorf("internal server error")
 		}
-		go func() {
-			// logMsg := fmt.Sprintf("New user joined\n\nId: %d,\nUsername: @%s", userInfo.Id, userInfo.Username)
-			b.HandleRefer(userInfo, m, e, builder)
-			// b.SendLogMessage(logMsg)
-		}()
+		if _, err := b.HandleRefer(userInfo, m, e, builder); err != nil {
+			slog.Error("Failed to handle referral", "error", err)
+		}
 	}
 	if dbUser.IsBanned {
-		errMsg := fmt.Errorf("You are banned to use this bot\nContact admin for more info")
-		builder.Text(ctx, errMsg.Error())
+		errMsg := fmt.Errorf("you are banned to use this bot\ncontact admin for more info")
+		if _, err := builder.Text(ctx, errMsg.Error()); err != nil {
+			slog.Error("Failed to send ban message", "error", err)
+		}
 		return nil, nil, errMsg
 	}
 	if dbUser.Credit < b.Cfg.MAX_CREDITS &&
@@ -125,7 +125,7 @@ func (b *Bot) validateAndGetUser(ctx context.Context, m *tg.Message,
 		dbUser, err = b.userService.IncrementCredits(ctx, dbUser.ID, int32(b.Cfg.INCREMENT_CREDITS), true)
 		if err != nil {
 			slog.Error("Failed to increment credit", "error", err)
-			return nil, nil, fmt.Errorf("Internal server error")
+			return nil, nil, fmt.Errorf("internal server error")
 		}
 	}
 	return userInfo, dbUser, nil

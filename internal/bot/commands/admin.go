@@ -97,7 +97,9 @@ func (bc *Context) HandleBroadcast(adminId int64) (tg.UpdatesClass, error) {
 			userChan <- user
 			if idx > 0 && idx%30 == 0 {
 				msg := fmt.Sprintf("Completed %d, Failed %d", completedCounter.Load(), failedCounter.Load())
-				bc.sender.To(fromPeer.InputPeer()).Edit(updateMsgId).Text(bc.ctx, msg)
+				if _, err := bc.sender.To(fromPeer.InputPeer()).Edit(updateMsgId).Text(bc.ctx, msg); err != nil {
+					slog.Error("Failed to edit broadcast status message", "error", err)
+				}
 			}
 		}
 	}()
@@ -139,7 +141,9 @@ func (bc *Context) HandleToggleBan(adminId int64, banStatus bool) (tg.UpdatesCla
 	}
 	_, targetInputPeer, err := botutils.GetUserPeer(bc.client.API(), bc.ctx, targetUser.ID)
 	if err != nil {
-		bc.Reply(fmt.Sprintf("Failed to get user peer! Err : %s", err.Error()))
+		if _, err := bc.Reply(fmt.Sprintf("Failed to get user peer! Err : %s", err.Error())); err != nil {
+			slog.Error("Failed to reply with error message", "error", err)
+		}
 	}
 	_, err = bc.sender.To(targetInputPeer.InputPeer()).Text(bc.ctx, fmt.Sprintf("You have been %sed by admin!", command))
 	if err != nil {

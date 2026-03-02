@@ -28,7 +28,11 @@ func New(ctx context.Context, connString string) (*redis.Client, RedisService, e
 	client := redis.NewClient(opt)
 	err = client.Ping(ctx).Err()
 	if err != nil {
-		defer client.Close()
+		defer func() {
+			if err = client.Close(); err != nil {
+				slog.Error("Failed to close redis client", "error", err)
+			}
+		}()
 		return nil, nil, err
 	}
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,7 +15,6 @@ import (
 
 	"github.com/biisal/fast-stream-bot/config"
 	repo "github.com/biisal/fast-stream-bot/internal/database/psql/sqlc"
-	"github.com/biisal/fast-stream-bot/internal/service/user"
 	"github.com/biisal/fast-stream-bot/internal/types"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/telegram/peers"
@@ -27,7 +25,6 @@ import (
 
 var (
 	cachedInviteLink string
-	tgUserExpiresIn  time.Duration = 10 * time.Minute
 )
 
 func GetChannelMessage(ctx context.Context, channelID int64, messageId int, api *tg.Client) (*tg.Message, error) {
@@ -167,7 +164,9 @@ func CheckUserInMainChannel(ctx context.Context, client *telegram.Client, channe
 
 	isInChannel := participant != nil
 	if isInChannel {
-		redisClient.Set(ctx, key, "true", 1*time.Minute).Err()
+		if err := redisClient.Set(ctx, key, "true", 1*time.Minute).Err(); err != nil {
+			slog.Warn("Failed to set channel participant status in redis", "error", err)
+		}
 	}
 	return isInChannel
 }
@@ -224,34 +223,6 @@ func GetMainChannelInviteLink(ctx context.Context, api *tg.Client, cfg *config.C
 	}
 	cachedInviteLink = ""
 	return "", err
-}
-
-func getTgUserFromRedis(ctx context.Context, id int64, redisClient *redis.Client) (*user.TgUser, error) {
-	key := fmt.Sprintf("tguser:%d", id)
-	slog.Info("getting tgUser from redis", "key", key)
-	tgUser := &user.TgUser{}
-	b, err := redisClient.Get(ctx, key).Bytes()
-	if err != nil {
-		return nil, err
-	}
-	if err := json.Unmarshal(b, tgUser); err != nil {
-		return nil, err
-	}
-	return tgUser, nil
-}
-
-func setTgUserToRedis(ctx context.Context, tgUser *user.TgUser, redisClient *redis.Client) error {
-	key := fmt.Sprintf("tguser:%d", tgUser.ID)
-	slog.Info("setting tgUser to redis", "key", key)
-	data, err := json.Marshal(tgUser)
-	if err != nil {
-		return err
-	}
-	cmd := redisClient.Set(ctx, key, data, tgUserExpiresIn).Err()
-	if cmd != nil {
-		return cmd
-	}
-	return nil
 }
 
 type Commit struct {

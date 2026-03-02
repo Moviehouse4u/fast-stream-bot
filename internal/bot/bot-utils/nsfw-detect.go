@@ -91,14 +91,24 @@ func DetectNSFW(ctx context.Context, fileMeta *types.File, client *telegram.Clie
 		slog.Error("Failed to create temp video", "error", err)
 		return false
 	}
-	defer os.Remove(tmpVid.Name())
-	defer tmpVid.Close()
+	defer func() {
+		if err = os.Remove(tmpVid.Name()); err != nil {
+			slog.Warn("Failed to remove temp video", "path", tmpVid.Name(), "error", err)
+		}
+	}()
+	defer func() {
+		if err = tmpVid.Close(); err != nil {
+			slog.Warn("Failed to close temp video", "error", err)
+		}
+	}()
 
 	if _, err := tmpVid.Write(allBytes); err != nil {
 		slog.Error("Failed to write temp video", "error", err)
 		return false
 	}
-	tmpVid.Sync()
+	if err = tmpVid.Sync(); err != nil {
+		slog.Warn("Failed to sync temp video", "error", err)
+	}
 
 	// Temp image
 	tmpImg, err := os.CreateTemp("", "frame_*.jpg")
@@ -107,8 +117,14 @@ func DetectNSFW(ctx context.Context, fileMeta *types.File, client *telegram.Clie
 		return false
 	}
 	imgPath := tmpImg.Name()
-	tmpImg.Close()
-	defer os.Remove(imgPath)
+	if err := tmpImg.Close(); err != nil {
+		slog.Warn("Failed to close temp image", "error", err)
+	}
+	defer func() {
+		if err := os.Remove(imgPath); err != nil {
+			slog.Warn("Failed to remove temp image", "path", imgPath, "error", err)
+		}
+	}()
 
 	// Try middle timestamp first
 	if !extractFrameAtTime(tmpVid.Name(), imgPath, "00:00:02") {

@@ -85,7 +85,11 @@ func mount(cfg config.Config, flags AppFlags) error {
 		slog.Error("Error connecting to redis", "error", err)
 		return err
 	}
-	defer redisConn.Close()
+	defer func() {
+		if err := redisConn.Close(); err != nil {
+			slog.Error("Error closing redis connection", "error", err)
+		}
+	}()
 
 	userService := user.NewService(r, rdNew, time.Minute*5)
 	worker := bot.StartWorkers(&cfg, userService)

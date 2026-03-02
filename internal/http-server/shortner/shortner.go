@@ -97,10 +97,7 @@ func (s *svc) VerifyUUID(r *http.Request) bool {
 	}
 	key := fmt.Sprintf("uuid:%s", id)
 	val := s.redis.Get(r.Context(), key)
-	if len(val) > 0 {
-		return true
-	}
-	return false
+	return len(val) > 0
 }
 func (s *svc) SetUUID(r *http.Request) string {
 	id := fmt.Sprintf("%x", uuid.New())[:8]
@@ -137,7 +134,11 @@ func (s *svc) CreateShortnerLink(urlToShort string) string {
 		slog.Error("Failed to get shortner link", "error", err)
 		return ""
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Warn("Failed to close response body", "error", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		slog.Error("Failed to get shortner link", "error", resp.Status)
 		return ""

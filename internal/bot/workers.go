@@ -62,7 +62,9 @@ func startClient(worker *Worker, botToken string, cfg *config.Config, workerNum 
 			bot.BotUserName = self.Username
 		}
 		slog.Info("Bot started", "bot_username", bot.BotUserName)
-		bot.Sender.To(&tg.InputPeerUser{UserID: cfg.ADMIN_ID}).Text(ctx, "Bot is running")
+		if _, err := bot.Sender.To(&tg.InputPeerUser{UserID: cfg.ADMIN_ID}).Text(ctx, "Bot is running"); err != nil {
+			slog.Error("Failed to send status message to admin", "error", err)
+		}
 		done = true
 		wg.Done()
 		<-ctx.Done()
@@ -92,7 +94,7 @@ func (w *Worker) HireFreeWorker() (*Bot, error) {
 
 	totalBots := len(w.Bots)
 	if totalBots == 0 {
-		return nil, fmt.Errorf("No bots available in worker pool")
+		return nil, fmt.Errorf("no bots available in worker pool")
 	}
 	selected := w.Bots[w.RunningBotIndex]
 	if time.Since(w.Timer) < time.Duration(WorkingTimerSec)*time.Second {

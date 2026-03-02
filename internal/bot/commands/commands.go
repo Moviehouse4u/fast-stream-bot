@@ -117,7 +117,9 @@ func (b *Context) SendLogMessage(msg string) error {
 	if err != nil {
 		return err
 	}
-	b.sender.To(inputPeer.InputPeer()).Text(ctx, msg)
+	if _, err := b.sender.To(inputPeer.InputPeer()).Text(ctx, msg); err != nil {
+		slog.Error("Failed to send log message to channel", "error", err)
+	}
 	return nil
 }
 

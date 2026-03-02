@@ -303,7 +303,9 @@ func (h *StreamHandler) MakeHashByChanMsgID() http.HandlerFunc {
 
 func (h *StreamHandler) Ping() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "pong")
+		if _, err := fmt.Fprint(w, "pong"); err != nil {
+			slog.Error("Failed to write pong response", "error", err)
+		}
 		w.WriteHeader(http.StatusOK)
 	}
 }
