@@ -77,10 +77,13 @@ func (bc *Context) HandleStart() (tg.UpdatesClass, error) {
 	msg := fmt.Sprintf(`Hello %s,
 Welcome! I’m your file streaming bot.
 Simply send me a file, and I’ll generate a fast, streamable link so you can watch it online or download it anytime, anywhere.
-Please don't send any sensitive adult content or any illegal content. Otherwise, you will be banned permanently.
-Your Credits: %d
+Please don't send any sensitive adult content or any illegal content. Otherwise, you will be banned permanently.`, username)
 
-for help send /help`, username, bc.dbUser.Credit)
+	if bc.cfg.REF {
+		msg += fmt.Sprintf("\nYour Credits: %d", bc.dbUser.Credit)
+	}
+
+	msg += "\n\nfor help send /help"
 
 	shareLink := botutils.GetReferLink(bc.userInfo.Username, bc.userInfo.ID)
 	keyboard := markup.InlineKeyboard(
@@ -135,8 +138,11 @@ Please join our channel and continue using this bot :)`
 }
 
 func (bc *Context) HandleStat(adminID int64) (tg.UpdatesClass, error) {
-	statMsg := fmt.Sprintf("Your statistics:\n\nTotal links: %d\nTotal credits: %d", bc.dbUser.TotalLinks,
-		bc.dbUser.Credit)
+	statMsg := fmt.Sprintf("Your statistics:\n\nTotal links: %d", bc.dbUser.TotalLinks)
+	if bc.cfg.REF {
+		statMsg += fmt.Sprintf("\nTotal credits: %d", bc.dbUser.Credit)
+	}
+
 	if bc.userInfo.ID == adminID {
 		totalUserCount, err := bc.userService.GetUsersCount(bc.ctx)
 		if err != nil {
