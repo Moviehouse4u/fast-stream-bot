@@ -17,6 +17,7 @@ import (
 	repo "github.com/biisal/fast-stream-bot/internal/database/psql/sqlc"
 	"github.com/biisal/fast-stream-bot/internal/types"
 	"github.com/gotd/td/telegram"
+	"github.com/gotd/td/telegram/message"
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
 	"github.com/gotd/td/tgerr"
@@ -375,4 +376,18 @@ func GetReferLink(botUserName string, userId int64) string {
 	shareUrl = strings.ReplaceAll(shareUrl, " ", "%20")
 	shareUrl = strings.ReplaceAll(shareUrl, "!", "%21")
 	return shareUrl
+}
+
+func SendLogMessage(ctx context.Context, api *tg.Client, sender *message.Sender, logChannelID int64, msg string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	_, inputPeer, err := GetChannelPeer(api, ctx, logChannelID)
+	if err != nil {
+		return err
+	}
+	if _, err := sender.To(inputPeer.InputPeer()).Text(ctx, msg); err != nil {
+		slog.Error("Failed to send log message to channel", "error", err)
+		return err
+	}
+	return nil
 }

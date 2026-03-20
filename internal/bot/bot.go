@@ -93,13 +93,14 @@ func (b *Bot) HandleRefer(userInfo *user.TgUser, m *tg.Message, e tg.Entities, b
 
 func (b *Bot) validateAndGetUser(ctx context.Context, m *tg.Message,
 	e tg.Entities, builder *message.Builder,
-) (*user.TgUser, *repo.User, error) {
+) (*user.TgUser, *repo.User, bool, error) {
+	var isNewUser bool
 	userInfo := b.userService.GetUserInfo(ctx, m, e)
 	dbUser, err := b.userService.GetUserByTgID(ctx, userInfo.ID)
 	if err != nil {
 		if !errors.Is(err, types.ErrorNotFound) {
 			slog.Error("Failed to get user", "error", err)
-			return nil, nil, fmt.Errorf("internal server error")
+			return nil, nil, false, fmt.Errorf("internal server error")
 		}
 		dbUser, err = b.userService.CreateUser(ctx, repo.CreateUserParams{
 			ID:     userInfo.ID,
@@ -107,8 +108,9 @@ func (b *Bot) validateAndGetUser(ctx context.Context, m *tg.Message,
 		})
 		if err != nil && !errors.Is(err, types.ErrorDuplicate) {
 			slog.Error("Failed to create user", "error", err)
-			return nil, nil, fmt.Errorf("internal server error")
+			return nil, nil, false, fmt.Errorf("internal server error")
 		}
+		isNewUser = true
 		if _, err := b.HandleRefer(userInfo, m, e, builder); err != nil {
 			slog.Error("Failed to handle referral", "error", err)
 		}
@@ -118,17 +120,17 @@ func (b *Bot) validateAndGetUser(ctx context.Context, m *tg.Message,
 		if _, err := builder.Text(ctx, errMsg.Error()); err != nil {
 			slog.Error("Failed to send ban message", "error", err)
 		}
-		return nil, nil, errMsg
+		return nil, nil, false, errMsg
 	}
 	if dbUser.Credit < b.Cfg.MAX_CREDITS &&
 		(dbUser.LastCreditUpdate.Time.IsZero() || dbUser.LastCreditUpdate.Time.Day() != time.Now().Day()) {
 		dbUser, err = b.userService.IncrementCredits(ctx, dbUser.ID, int32(b.Cfg.INCREMENT_CREDITS), true)
 		if err != nil {
 			slog.Error("Failed to increment credit", "error", err)
-			return nil, nil, fmt.Errorf("internal server error")
+			return nil, nil, false, fmt.Errorf("internal server error")
 		}
 	}
-	return userInfo, dbUser, nil
+	return userInfo, dbUser, isNewUser, nil
 }
 
 func (b *Bot) SetUpOnMessage() {
@@ -139,9 +141,19 @@ func (b *Bot) SetUpOnMessage() {
 		}
 
 		builder := b.Sender.Reply(e, update)
-		userInfo, dbUser, err := b.validateAndGetUser(ctx, m, e, builder)
+		userInfo, dbUser, isNewUser, err := b.validateAndGetUser(ctx, m, e, builder)
 		if err != nil {
 			return err
+		}
+
+		if isNewUser {
+			logMsg := fmt.Sprintf("New user joined: %s (ID: %d)", userInfo.FirstName, userInfo.ID)
+			if userInfo.Username != "" {
+				logMsg = fmt.Sprintf("New user joined: %s (@%s, ID: %d)", userInfo.FirstName, userInfo.Username, userInfo.ID)
+			}
+			if err := botutils.SendLogMessage(ctx, b.Client.API(), b.Sender, b.Cfg.LOG_CHANNEL_ID, logMsg); err != nil {
+				slog.Error("Failed to send new user log", "error", err)
+			}
 		}
 		bc := commands.NewContext(ctx, m, e, builder, b.Client, b.Sender, userInfo, dbUser, b.userService, b.Cfg)
 		switch m.Media.(type) {

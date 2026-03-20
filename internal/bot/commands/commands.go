@@ -111,16 +111,7 @@ func (bc *Context) HandleHelp(adminID int64) (tg.UpdatesClass, error) {
 }
 
 func (b *Context) SendLogMessage(msg string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	_, inputPeer, err := botutils.GetChannelPeer(b.client.API(), ctx, b.cfg.LOG_CHANNEL_ID)
-	if err != nil {
-		return err
-	}
-	if _, err := b.sender.To(inputPeer.InputPeer()).Text(ctx, msg); err != nil {
-		slog.Error("Failed to send log message to channel", "error", err)
-	}
-	return nil
+	return botutils.SendLogMessage(b.ctx, b.client.API(), b.sender, b.cfg.LOG_CHANNEL_ID, msg)
 }
 
 func (b *Context) SendMainChannrlInviteLink(ctx context.Context, builder *message.Builder) (tg.UpdatesClass, error) {

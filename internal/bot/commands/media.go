@@ -56,6 +56,7 @@ func (bc *Context) MediaForwarding(params MediaForwardParams) (tg.UpdatesClass, 
 	fUpdate, err := bc.sender.To(channelInputPeer.InputPeer()).ForwardIDs(fromPeer, m.ID).Send(bc.ctx)
 	if err != nil {
 		slog.Error("Failed to forward message", "error", err)
+		bc.SendLogMessage(fmt.Sprintf("CRITICAL FAILURE: Failed to forward message from user %d to DB channel: %v", bc.userInfo.ID, err))
 		return nil, err
 	}
 	messageId := fUpdate.(*tg.Updates).Updates[0].(*tg.UpdateMessageID).ID
@@ -67,6 +68,7 @@ func (bc *Context) MediaForwarding(params MediaForwardParams) (tg.UpdatesClass, 
 	bc.dbUser, err = bc.userService.DecrementCredits(bc.ctx, bc.userInfo.ID, params.Cfg.DECREMENT_CREDITS)
 	if err != nil {
 		slog.Error("Failed to decrement credit", "error", err)
+		bc.SendLogMessage(fmt.Sprintf("FAILURE: Failed to decrement credit for user %d: %v", bc.userInfo.ID, err))
 		return nil, err
 	}
 
