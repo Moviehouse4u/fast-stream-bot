@@ -136,30 +136,32 @@ func (h *StreamHandler) HomeStream() http.HandlerFunc {
 
 		isJustVerified := false
 		expireTime := (time.Duration(h.Cfg.JWT_EXPIRATION) * time.Second).String()
-		if !h.Shortner.CheckJWTFromCookie(r) {
-			slog.Info("No jwt found")
-			if h.Shortner.VerifyUUID(r) {
-				slog.Info("Found valid uuid")
-				if err = h.Shortner.SetJWTCookie(w); err == nil {
-					isJustVerified = true
-					h.Shortner.RemoveUUID(r)
-				}
-			} else {
-				var uuid = h.Shortner.SetUUID(r)
-				reqURI := r.URL.RequestURI()
-				separator := "?"
-				if strings.Contains(reqURI, "?") {
-					separator = "&"
-				}
-				finalURL := fmt.Sprintf("%s://%s%s%suuid=%s", h.Cfg.HTTP_SCHEME, r.Host, reqURI, separator, uuid)
-				if redirectURL := h.Shortner.CreateShortnerLink(finalURL); redirectURL != "" {
-					slog.Info("Redirecting to shortner link", "url", redirectURL)
-					http.Redirect(w, r, redirectURL, http.StatusSeeOther)
-					return
+		if h.Cfg.ENABLE_SHORTENER {
+			if !h.Shortner.CheckJWTFromCookie(r) {
+				slog.Info("No jwt found")
+				if h.Shortner.VerifyUUID(r) {
+					slog.Info("Found valid uuid")
+					if err = h.Shortner.SetJWTCookie(w); err == nil {
+						isJustVerified = true
+						h.Shortner.RemoveUUID(r)
+					}
+				} else {
+					var uuid = h.Shortner.SetUUID(r)
+					reqURI := r.URL.RequestURI()
+					separator := "?"
+					if strings.Contains(reqURI, "?") {
+						separator = "&"
+					}
+					finalURL := fmt.Sprintf("%s://%s%s%suuid=%s", h.Cfg.HTTP_SCHEME, r.Host, reqURI, separator, uuid)
+					if redirectURL := h.Shortner.CreateShortnerLink(finalURL); redirectURL != "" {
+						slog.Info("Redirecting to shortner link", "url", redirectURL)
+						http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+						return
+					}
+
 				}
 
 			}
-
 		}
 
 		if r.URL.Query().Get("redirect") == "vlc" {

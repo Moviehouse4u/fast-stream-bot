@@ -7,3 +7,4 @@ min_credits_required = 5
 initial_credits = 50
 increment_credits = 10
 decrement_credits = 10
+enable_shortener = true

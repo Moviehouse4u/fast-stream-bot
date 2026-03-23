@@ -331,7 +331,7 @@ func BroadcastToUsers(ctx context.Context,
 				break
 			}
 
-			if targetUser == nil {
+			if err != nil || targetUser == nil {
 				failedCounter.Add(1)
 				continue
 			}

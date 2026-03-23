@@ -31,6 +31,7 @@ type AppConfig struct {
 	INCREMENT_CREDITS    int32  `toml:"increment_credits" env:"INCREMENT_CREDITS"`
 	DECREMENT_CREDITS    int32  `toml:"decrement_credits" env:"DECREMENT_CREDITS"`
 	MAX_CREDITS          int32  `toml:"max_credits" env:"MAX_CREDITS"`
+	ENABLE_SHORTENER     bool   `toml:"enable_shortener" env:"ENABLE_SHORTENER"`
 }
 
 type Config struct {
