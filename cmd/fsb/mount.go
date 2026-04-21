@@ -82,7 +82,7 @@ func mount(cfg config.Config, flags AppFlags) error {
 		}
 	}()
 	userService := user.NewService(r, rdNew, time.Minute*5)
-	worker := bot.StartWorkers(&cfg, userService, redisConn) // ← yahi change hai
+	worker := bot.StartWorkers(&cfg, userService)
 	if len(worker.Bots) <= 0 {
 		errMsg := fmt.Errorf("no bots are running! returning")
 		slog.Error("No bots are running", "error", errMsg)
