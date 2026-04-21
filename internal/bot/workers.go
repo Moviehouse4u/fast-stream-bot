@@ -9,8 +9,11 @@ import (
 
 	"github.com/biisal/fast-stream-bot/config"
 	"github.com/biisal/fast-stream-bot/internal/service/user"
+	"github.com/gotd/td/session"
+	"github.com/gotd/td/session/tdsession"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/tg"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -31,7 +34,7 @@ func initWorker() *Worker {
 }
 
 func startClient(worker *Worker, botToken string, cfg *config.Config, workerNum int,
-	wg *sync.WaitGroup, userService user.Service,
+	wg *sync.WaitGroup, userService user.Service, redisClient *redis.Client,
 ) {
 	done := false
 	defer func() {
@@ -41,7 +44,15 @@ func startClient(worker *Worker, botToken string, cfg *config.Config, workerNum 
 	}()
 	ctx := context.Background()
 	dispatcher := tg.NewUpdateDispatcher()
-	client := telegram.NewClient(cfg.APP_KEY, cfg.APP_HASH, telegram.Options{UpdateHandler: dispatcher})
+
+	sessionKey := fmt.Sprintf("tg_session:%d", workerNum)
+	storage := tdsession.NewRedis(redisClient, sessionKey)
+
+	client := telegram.NewClient(cfg.APP_KEY, cfg.APP_HASH, telegram.Options{
+		UpdateHandler:  dispatcher,
+		SessionStorage: storage,
+	})
+
 	isDefault := workerNum == 0
 	bot := NewBot(ctx, cfg, client, &dispatcher, userService, isDefault)
 	if isDefault {
@@ -72,15 +83,14 @@ func startClient(worker *Worker, botToken string, cfg *config.Config, workerNum 
 	}); err != nil {
 		slog.Error("Failed to start bot", "error", err)
 	}
-
 }
 
-func StartWorkers(cfg *config.Config, userService user.Service) *Worker {
+func StartWorkers(cfg *config.Config, userService user.Service, redisClient *redis.Client) *Worker {
 	worker := initWorker()
 	var wg sync.WaitGroup
 	for i, botToken := range cfg.BOT_TOKENS {
 		wg.Add(1)
-		go startClient(worker, botToken, cfg, i, &wg, userService)
+		go startClient(worker, botToken, cfg, i, &wg, userService, redisClient)
 	}
 	slog.Debug("Waiting for bot workers to start")
 	wg.Wait()
@@ -91,7 +101,6 @@ func StartWorkers(cfg *config.Config, userService user.Service) *Worker {
 func (w *Worker) HireFreeWorker() (*Bot, error) {
 	w.mut.Lock()
 	defer w.mut.Unlock()
-
 	totalBots := len(w.Bots)
 	if totalBots == 0 {
 		return nil, fmt.Errorf("no bots available in worker pool")
@@ -101,7 +110,6 @@ func (w *Worker) HireFreeWorker() (*Bot, error) {
 		selected.WorkingPressure++
 		return selected, nil
 	}
-
 	botIdx := 0
 	minPressure := w.Bots[botIdx].WorkingPressure
 	for i, bot := range w.Bots {
