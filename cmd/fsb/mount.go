@@ -25,12 +25,10 @@ import (
 func runServer(cfg config.Config, worker *bot.Worker, redisClient rd.RedisService) error {
 	done := make(chan os.Signal, 1)
 	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-
 	s := shortner.NewShortner(
 		time.Duration(cfg.JWT_EXPIRATION)*time.Second,
 		time.Duration(cfg.UUID_EXPIRATION)*time.Second,
 		cfg.JWT_SECRET, redisClient, cfg.SHORTNER_URL, cfg.SHORTNER_API, cfg)
-
 	mux := routers.SetUpRouters(worker, cfg, s)
 	server := http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTP_PORT),
@@ -42,16 +40,13 @@ func runServer(cfg config.Config, worker *bot.Worker, redisClient rd.RedisServic
 			slog.Error("HTTP server stopped", "error", err)
 		}
 	}()
-
 	<-done
 	ctx, cancle := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancle()
-
 	if err := server.Shutdown(ctx); err != nil {
 		slog.Error("HTTP server stopped", "error", err)
 		return err
 	}
-
 	return nil
 }
 
@@ -62,7 +57,6 @@ func mount(cfg config.Config, flags AppFlags) error {
 	if err != nil {
 		log.Fatal("Error setting up logger", "error", err.Error())
 	}
-
 	defer func() {
 		if file != nil {
 			if err = file.Close(); err != nil {
@@ -70,16 +64,13 @@ func mount(cfg config.Config, flags AppFlags) error {
 			}
 		}
 	}()
-
 	dbConn, err := db.CreateConn(ctx, cfg.DBSTRING, flags.InitDB)
 	if err != nil {
 		slog.Error("Error connecting to database", "error", err)
 		return err
 	}
 	defer dbConn.Close()
-
 	r := repo.New(dbConn)
-
 	redisConn, rdNew, err := rd.New(ctx, cfg.REDIS_DBSTRING)
 	if err != nil {
 		slog.Error("Error connecting to redis", "error", err)
@@ -90,9 +81,8 @@ func mount(cfg config.Config, flags AppFlags) error {
 			slog.Error("Error closing redis connection", "error", err)
 		}
 	}()
-
 	userService := user.NewService(r, rdNew, time.Minute*5)
-	worker := bot.StartWorkers(&cfg, userService)
+	worker := bot.StartWorkers(&cfg, userService, redisConn) // ← yahi change hai
 	if len(worker.Bots) <= 0 {
 		errMsg := fmt.Errorf("no bots are running! returning")
 		slog.Error("No bots are running", "error", errMsg)
